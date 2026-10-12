@@ -1,0 +1,121 @@
+# Core service mesh for a containerized run (design docs 01 §3, 03, 04).
+#
+# Two sides, bridged only by the write-only telemetry sink (doc 04 §3):
+#   * agentlab-agents  — the agents' bridge network. Agents, Armory, honeypot,
+#                        oracle, telemetry sink, and the egress proxy live here.
+#   * ui-host          — a separate network for the operator UI, which the agent
+#                        containers have NO route to. The UI is published only on
+#                        127.0.0.1 of the host.
+#
+# The generated per-run file (runs/<id>/agents.compose.yaml) adds the agent
+# services and is merged in:
+#   docker compose -f docker/compose.yaml -f runs/<id>/agents.compose.yaml up
+#
+# Required host environment:
+#   ARMORY_TOKEN        the single shared Armory bearer token
+#   AGENTLAB_RUN_DIR    absolute path to this run's dir (holds manifest.json)
+#   AGENTLAB_EGRESS     comma-separated egress allowlist (match the run config)
+#   OPENAI_API_KEY etc. backend keys, injected per agent by the generated file
+
+x-image: &image
+  build:
+    context: ..
+    dockerfile: docker/Dockerfile
+  image: agentlab-agent:latest
+
+networks:
+  agentlab-agents:
+    name: agentlab-agents
+    driver: bridge
+  ui-host:
+    name: agentlab-ui
+    driver: bridge
+
+volumes:
+  eventdata: {}
+  armorydata: {}
+
+services:
+  telemetry-sink:
+    <<: *image
+    command: ["uvicorn", "agentlab.telemetry_sink.app:app", "--host", "0.0.0.0", "--port", "8900"]
+    environment:
+      AGENTLAB_EVENT_DB: /data/events.sqlite3
+      AGENTLAB_BLOB_DIR: /data/blobs
+    volumes:
+      - eventdata:/data
+    networks: [agentlab-agents]
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+
+  armory:
+    <<: *image
+    command: ["uvicorn", "agentlab.armory.app:app", "--host", "0.0.0.0", "--port", "8800"]
+    environment:
+      ARMORY_TOKEN: ${ARMORY_TOKEN:?set ARMORY_TOKEN}
+      ARMORY_DB: /data/armory.sqlite3
+      AGENTLAB_TELEMETRY: http://telemetry-sink:8900/events
+    volumes:
+      - armorydata:/data
+    networks: [agentlab-agents]
+    depends_on: [telemetry-sink]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+
+  honeypot:
+    <<: *image
+    command: ["uvicorn", "agentlab.honeypot.app:app", "--host", "0.0.0.0", "--port", "8700"]
+    environment:
+      AGENTLAB_TELEMETRY: http://telemetry-sink:8900/events
+    networks: [agentlab-agents]
+    depends_on: [telemetry-sink]
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+
+  oracle:
+    <<: *image
+    command: ["uvicorn", "agentlab.oracle.app:app", "--host", "0.0.0.0", "--port", "8600"]
+    environment:
+      AGENTLAB_MANIFEST: /run/manifest.json
+      AGENTLAB_TELEMETRY: http://telemetry-sink:8900/events
+    volumes:
+      - ${AGENTLAB_RUN_DIR:?set AGENTLAB_RUN_DIR}:/run:ro
+    networks: [agentlab-agents]
+    depends_on: [telemetry-sink]
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+
+  egress-proxy:
+    <<: *image
+    command: ["python", "-m", "agentlab.proxy.proxy"]
+    environment:
+      AGENTLAB_EGRESS_ALLOW: ${AGENTLAB_EGRESS:-armory,oracle,honeypot,telemetry-sink}
+      AGENTLAB_PROXY_PORT: "3128"
+    networks: [agentlab-agents]
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+
+  # Operator UI — deliberately NOT on agentlab-agents, and published only on the
+  # host loopback (doc 04 §2). Agents have no route to it.
+  ui:
+    <<: *image
+    command: ["uvicorn", "agentlab.ui.backend:app", "--host", "0.0.0.0", "--port", "8500"]
+    environment:
+      AGENTLAB_EVENT_DB: /data/events.sqlite3
+      AGENTLAB_MANIFEST: /run/manifest.json
+    volumes:
+      - eventdata:/data:ro
+      - ${AGENTLAB_RUN_DIR:?set AGENTLAB_RUN_DIR}:/run:ro
+    networks: [ui-host]
+    ports:
+      - "127.0.0.1:8500:8500"
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]

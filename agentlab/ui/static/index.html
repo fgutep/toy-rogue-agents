@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>agentlab operator</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --border: #262b36; --fg: #e6e9ef;
+    --muted: #8b93a7; --accent: #6ea8fe; --warn: #ffb020; --alert: #ff5d5d;
+    --ok: #4cd08a; --tool: #c08cff;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #f6f7f9; --panel: #ffffff; --border: #e2e5ea; --fg: #1b1e25;
+      --muted: #5f6b7e; --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+         background: var(--bg); color: var(--fg); }
+  header { padding: 10px 16px; border-bottom: 1px solid var(--border);
+           display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  header h1 { font-size: 15px; margin: 0; }
+  .pill { padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px;
+          color: var(--muted); }
+  main { display: grid; grid-template-columns: 1fr 360px; gap: 12px; padding: 12px; }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+  .col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .card { background: var(--panel); border: 1px solid var(--border);
+          border-radius: 8px; overflow: hidden; }
+  .card > h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em;
+               color: var(--muted); margin: 0; padding: 8px 12px;
+               border-bottom: 1px solid var(--border); }
+  .card > .body { padding: 10px 12px; max-height: 42vh; overflow: auto; }
+  .agents { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 12px; }
+  .turn { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dashed var(--border); }
+  .role { color: var(--accent); }
+  .tool { color: var(--tool); }
+  .muted { color: var(--muted); }
+  .alert-item { border-left: 3px solid var(--alert); padding: 6px 8px; margin-bottom: 6px;
+                cursor: pointer; background: rgba(255,93,93,.07); }
+  pre { white-space: pre-wrap; word-break: break-word; margin: 4px 0; }
+  button { font: inherit; background: var(--panel); color: var(--fg);
+           border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px;
+           cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  .ops { display: flex; gap: 6px; flex-wrap: wrap; }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { text-align: left; padding: 3px 6px; border-bottom: 1px solid var(--border);
+           vertical-align: top; }
+  code { color: var(--warn); }
+</style>
+</head>
+<body>
+<header>
+  <h1>agentlab · operator</h1>
+  <span class="pill" id="conn">connecting…</span>
+  <span class="pill" id="runid">run: —</span>
+  <span class="pill" id="count">0 events</span>
+  <span style="flex:1"></span>
+  <div class="ops">
+    <button data-action="pause" data-scope="run">pause run</button>
+    <button data-action="resume" data-scope="run">resume run</button>
+    <button data-action="kill" data-scope="run">kill run</button>
+  </div>
+</header>
+<main>
+  <div class="col">
+    <div class="card">
+      <h2>Live transcripts</h2>
+      <div class="body"><div class="agents" id="agents"></div></div>
+    </div>
+    <div class="card">
+      <h2>Shared-artifact timeline (Armory reads/writes)</h2>
+      <div class="body"><table id="provenance"><tbody></tbody></table></div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="card">
+      <h2>Alerts</h2>
+      <div class="body" id="alerts"><div class="muted">none yet</div></div>
+    </div>
+    <div class="card">
+      <h2>Run / config</h2>
+      <div class="body" id="manifest"><div class="muted">loading…</div></div>
+    </div>
+  </div>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

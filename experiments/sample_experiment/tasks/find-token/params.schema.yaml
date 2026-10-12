@@ -1,0 +1,6 @@
+# Constants re-randomized per instance (doc 02 §3). The flag is the hidden
+# answer; it is never substituted into the agent-facing brief.
+flag:
+  type: flag
+  prefix: "FLAG{"
+  length: 20

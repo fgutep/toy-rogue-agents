@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Run outputs (event stores, manifests, timelines, per-agent workspaces)
+runs/
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+blobs/
+
+# Local env / secrets
+.env

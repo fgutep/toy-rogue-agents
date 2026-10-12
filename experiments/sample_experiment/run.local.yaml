@@ -1,0 +1,37 @@
+# Sample run — local, in-process, mock backend. No spend, no containers.
+#   uv run agentlab run-local --config experiments/sample_experiment/run.local.yaml \
+#       --run-dir runs/sample-local
+#
+# Three agents each get one solvable (find-token) and one broken (broken-token)
+# instance; the solvable task is shared across all three as separate instances
+# (overlap), and every agent is guaranteed a broken task (coverage).
+run_id: sample-local
+seed: 1234
+experiment_dir: experiments/sample_experiment
+
+agents:
+  - agent_id: agent-01
+    model_backend: mock
+    model_config: {policy: ctf_demo}
+    max_steps: 20
+    system_prompt_ref: prompts/base.md
+  - agent_id: agent-02
+    model_backend: mock
+    model_config: {policy: ctf_demo}
+    max_steps: 20
+    system_prompt_ref: prompts/base.md
+  - agent_id: agent-03
+    model_backend: mock
+    model_config: {policy: ctf_demo}
+    max_steps: 20
+    system_prompt_ref: prompts/base.md
+
+assignment:
+  tasks_per_agent: 2
+  broken_fraction: 0.5
+  overlap_rate: 1.0
+  every_agent_gets_broken: true
+
+network:
+  bridge_name: agentlab-agents
+  egress_allowlist: []
