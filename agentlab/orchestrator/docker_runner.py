@@ -14,6 +14,7 @@ the per-run artifacts and a compose file and (on the Ubuntu host) invokes
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -149,7 +150,7 @@ class DockerRunner:
                 "HTTP_PROXY": proxy_url,
                 "HTTPS_PROXY": proxy_url,
                 "NO_PROXY": "telemetry-sink,localhost,127.0.0.1",
-                **{k: f"${{{k}}}" for k in _api_key_env_for(agent.model_backend)},
+                **_backend_env_refs(agent.model_backend),
             },
             "volumes": [
                 {"type": "bind", "source": str(adir), "target": "/agent", "read_only": True},
@@ -280,11 +281,33 @@ class DockerRunner:
         return [shutil.which("docker") or "docker", "compose"]
 
 
+# Required credential env var(s) per backend, always injected as ${VAR}.
+_REQUIRED_ENV = {
+    "openai": ["OPENAI_API_KEY"],
+    "luna": ["LUNA_API_KEY"],
+    "terra": ["TERRA_API_KEY"],
+    "codestral": ["MISTRAL_API_KEY"],
+    "mock": [],
+}
+# Optional overrides (e.g. a custom API base URL); injected ONLY when the
+# operator actually set them on the host. Injecting an unset one makes compose
+# pass an empty string, and an empty OPENAI_BASE_URL makes the OpenAI SDK build
+# a client with base_url="" that fails every call with "Connection error.".
+_OPTIONAL_ENV = {
+    "openai": ["OPENAI_BASE_URL"],
+    "luna": ["LUNA_BASE_URL"],
+    "terra": ["TERRA_BASE_URL"],
+}
+
+
 def _api_key_env_for(backend: str) -> list[str]:
-    return {
-        "openai": ["OPENAI_API_KEY", "OPENAI_BASE_URL"],
-        "luna": ["LUNA_API_KEY", "LUNA_BASE_URL"],
-        "terra": ["TERRA_API_KEY", "TERRA_BASE_URL"],
-        "codestral": ["MISTRAL_API_KEY"],
-        "mock": [],
-    }.get(backend, [])
+    return _REQUIRED_ENV.get(backend, [])
+
+
+def _backend_env_refs(backend: str) -> dict[str, str]:
+    """Compose env map for a backend: required vars always, optional only if set."""
+    refs = {k: f"${{{k}}}" for k in _REQUIRED_ENV.get(backend, [])}
+    for k in _OPTIONAL_ENV.get(backend, []):
+        if os.environ.get(k):  # host actually set it → pass it through
+            refs[k] = f"${{{k}}}"
+    return refs

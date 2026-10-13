@@ -103,7 +103,16 @@ class OpenAICompatAdapter(ModelAdapter):
             raise OtherAdapterError(
                 f"{self.provider}: {self.api_key_env} is not set", provider=self.provider
             )
-        base_url = os.environ.get(self.base_url_env) or self.default_base_url
+        raw_base_url = os.environ.get(self.base_url_env)
+        base_url = raw_base_url or self.default_base_url
+        # When base_url is falsy the OpenAI SDK falls back to reading
+        # ``self.base_url_env`` from the environment itself — and an *empty*
+        # value there (as compose injects for an unset optional var) yields a
+        # client with base_url="" that fails every request with a bare
+        # "Connection error.". Drop the empty var so the SDK uses its real
+        # built-in default.
+        if not raw_base_url and self.base_url_env in os.environ:
+            os.environ.pop(self.base_url_env, None)
         self._client = OpenAI(api_key=api_key, base_url=base_url)
         self._model = model_config.get("model") or self.default_model
         if not self._model:

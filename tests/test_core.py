@@ -24,6 +24,28 @@ def test_unknown_backend_raises():
         get_adapter_class("nope")
 
 
+def test_openai_empty_base_url_env_does_not_break_client(monkeypatch):
+    # Compose injects OPENAI_BASE_URL="" for an unset optional var; the SDK
+    # must still target the real default, not an empty base_url.
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    monkeypatch.setenv("OPENAI_BASE_URL", "")
+    adapter = build_adapter("openai", {"model": "gpt-4.1"})
+    assert str(adapter._client.base_url).startswith("https://api.openai.com")
+    # The empty env var must have been removed so the SDK can't re-read it.
+    import os
+    assert os.environ.get("OPENAI_BASE_URL") in (None, )
+
+
+def test_backend_env_refs_omit_unset_optional(monkeypatch):
+    from agentlab.orchestrator.docker_runner import _backend_env_refs
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+    refs = _backend_env_refs("openai")
+    assert refs == {"OPENAI_API_KEY": "${OPENAI_API_KEY}"}
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://proxy.example/v1")
+    refs = _backend_env_refs("openai")
+    assert refs["OPENAI_BASE_URL"] == "${OPENAI_BASE_URL}"
+
+
 def test_tool_workspace_scoping(tmp_path: Path):
     reg = build_default_registry()
     ctx = ToolContext(agent_id="a", workspace=tmp_path, telemetry=NullTelemetryClient())
