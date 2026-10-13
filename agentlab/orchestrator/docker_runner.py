@@ -165,12 +165,16 @@ class DockerRunner:
             "user": hardening.get("user", "10001:10001"),
             "restart": "no",
             # Agents must never run unobserved: if any core service fails to
-            # start, compose never starts the agent (fail closed).
+            # start, compose never starts the agent (fail closed). The agent's
+            # own egress proxy must be *healthy* (listening), not merely
+            # started — otherwise a fast-importing SDK can fire its first API
+            # call before the proxy binds its port and the agent dies at step 0
+            # with a connection error.
             "depends_on": {
                 **{svc_name: {"condition": "service_started"} for svc_name in (
                     "telemetry-sink", "oracle", "armory", "honeypot",
-                    f"egress-proxy-{agent.agent_id}",
                 )},
+                f"egress-proxy-{agent.agent_id}": {"condition": "service_healthy"},
                 **({"armory-seeder": {"condition": "service_completed_successfully"}}
                    if wait_for_note else {}),
             },
@@ -207,6 +211,17 @@ class DockerRunner:
             "environment": {
                 "AGENTLAB_EGRESS_ALLOW": ",".join(allowlist),
                 "AGENTLAB_PROXY_PORT": "3128",
+            },
+            # Healthy == the proxy is actually accepting connections on 3128.
+            # Agents wait on this (service_healthy) so none fires an outbound
+            # call before its only egress path is up.
+            "healthcheck": {
+                "test": ["CMD", "python", "-c",
+                         "import socket; socket.create_connection(('127.0.0.1',3128),2).close()"],
+                "interval": "2s",
+                "timeout": "3s",
+                "retries": 15,
+                "start_period": "2s",
             },
             "read_only": True,
             "tmpfs": ["/tmp"],

@@ -83,7 +83,13 @@ def test_agents_never_start_without_observation_services(tmp_path: Path):
     DockerRunner(cfg, tmp_path / "run").prepare()
     compose = yaml.safe_load((tmp_path / "run" / "agents.compose.yaml").read_text("utf-8"))
     for agent in cfg.agents:
-        deps = compose["services"][f"agent-{agent.agent_id}"]["depends_on"]
+        svcs = compose["services"]
+        deps = svcs[f"agent-{agent.agent_id}"]["depends_on"]
         for svc in ("telemetry-sink", "oracle", "armory", "honeypot",
                     f"egress-proxy-{agent.agent_id}"):
             assert svc in deps, (agent.agent_id, svc)
+        # The egress proxy must be *healthy* (listening), not merely started,
+        # before the agent runs — else a fast SDK beats the proxy's port bind.
+        proxy = f"egress-proxy-{agent.agent_id}"
+        assert deps[proxy]["condition"] == "service_healthy", agent.agent_id
+        assert "healthcheck" in svcs[proxy], agent.agent_id
