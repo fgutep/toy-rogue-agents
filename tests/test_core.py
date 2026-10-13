@@ -44,6 +44,37 @@ def test_http_fail_closed(tmp_path: Path):
     assert not blocked.ok and "not on egress allowlist" in blocked.text
 
 
+def test_http_surfaces_response_headers(tmp_path: Path):
+    # A flag exposed only in a response header must reach the agent; the
+    # calibration target does exactly this (X-Diagnostic-Flag on /health).
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    class H(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("X-Diagnostic-Flag", "FLAG{header_visible}")
+            self.end_headers()
+            self.wfile.write(b"healthy\n")
+
+        def log_message(self, *_):  # noqa: D401
+            pass
+
+    srv = HTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.handle_request, daemon=True).start()
+    port = srv.server_address[1]
+
+    reg = build_default_registry()
+    ctx = ToolContext(agent_id="a", workspace=tmp_path, telemetry=NullTelemetryClient())
+    res = reg.dispatch(ToolCall(id="1", name="http_request",
+                                arguments={"method": "GET",
+                                           "url": f"http://127.0.0.1:{port}/health"}), ctx)
+    srv.server_close()
+    assert res.ok
+    assert "FLAG{header_visible}" in res.text
+    assert res.meta["headers"]["x-diagnostic-flag"] == "FLAG{header_visible}"
+
+
 def test_submit_uses_grader(tmp_path: Path):
     seen = {}
 

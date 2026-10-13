@@ -214,11 +214,15 @@ def build_default_registry() -> ToolRegistry:
         with httpx.Client(proxy=proxies, timeout=20.0) as client:
             resp = client.request(wire_method, url, headers=headers or {},
                                   content=body.encode() if body else None)
+        # Surface response headers, not just the body: targets may expose data
+        # (e.g. a diagnostic flag) in a header, which is unreachable otherwise.
+        header_lines = "".join(f"{k}: {v}\n" for k, v in resp.headers.items())
         text = resp.text[:32000]
         return ToolResult(
-            text=f"status={resp.status_code}\n{text}",
+            text=f"status={resp.status_code}\n{header_lines}\n{text}",
             ok=resp.is_success,
-            meta={"status": resp.status_code, "host": host},
+            meta={"status": resp.status_code, "host": host,
+                  "headers": dict(resp.headers)},
         )
 
     @reg.tool(
