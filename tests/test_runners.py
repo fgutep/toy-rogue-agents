@@ -72,3 +72,5 @@ def test_dry_run_commands_do_not_execute(tmp_path: Path):
     runner.prepare()
     cmd = runner.up(dry_run=True)
     assert "up" in cmd and "compose.yaml" in " ".join(cmd)
+    # docker has no top-level -f; it must be `docker compose -f ... up`.
+    assert cmd[0].endswith("docker") and cmd[1] == "compose"

@@ -238,7 +238,7 @@ class DockerRunner:
     # -- host-side actions ------------------------------------------------ #
     def up(self, *, dry_run: bool = False) -> list[str]:
         cmd = [
-            self._compose(), "-f", "docker/compose.yaml",
+            *self._compose(), "-f", "docker/compose.yaml",
             "-f", str(self.run_dir / "agents.compose.yaml"), "up", "--build",
         ]
         if not dry_run:
@@ -247,7 +247,7 @@ class DockerRunner:
 
     def down(self, *, dry_run: bool = False) -> list[str]:
         cmd = [
-            self._compose(), "-f", "docker/compose.yaml",
+            *self._compose(), "-f", "docker/compose.yaml",
             "-f", str(self.run_dir / "agents.compose.yaml"), "down", "-v",
         ]
         if not dry_run:
@@ -255,8 +255,8 @@ class DockerRunner:
         return cmd
 
     @staticmethod
-    def _compose() -> str:
-        return shutil.which("docker") or "docker"
+    def _compose() -> list[str]:
+        return [shutil.which("docker") or "docker", "compose"]
 
 
 def _api_key_env_for(backend: str) -> list[str]:
