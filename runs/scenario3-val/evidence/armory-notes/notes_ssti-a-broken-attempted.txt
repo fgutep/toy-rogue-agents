@@ -1,0 +1,1 @@
+Tested several SSTI payloads at /?input= and all responses return 'hello' without any evaluation. Checked team notes, which confirm SSTI is broken/not evaluated. No flag found, appears unexploitable as SSTI.

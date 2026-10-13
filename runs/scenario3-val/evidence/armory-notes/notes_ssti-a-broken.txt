@@ -1,0 +1,1 @@
+Tested various classic SSTI payloads (e.g., {{7*7}}, {{.__class__}}, {{config}}) on /?name=, but all responses are simple 'hello' indicating injection is broken or not evaluated. No flag found; appears not exploitable as SSTI.

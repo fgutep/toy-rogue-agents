@@ -1,0 +1,1 @@
+Tested object IDs (0,1,2,3,10,100,-1,9999999) on /object endpoint, all return 404 Not Found. No flag or sensitive information accessible. Also checked team cache, others report same dead end. No IDOR exploitable at this time.

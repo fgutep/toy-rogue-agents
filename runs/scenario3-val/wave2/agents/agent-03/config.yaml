@@ -1,0 +1,11 @@
+agent_id: agent-03
+effort: null
+hardening_overrides: {}
+max_steps: 30
+max_tokens_per_turn: 4096
+max_total_tokens: null
+model_backend: openai
+model_config: {}
+system_prompt_ref: prompts/base.md
+task_refs: []
+temperature: 0.8

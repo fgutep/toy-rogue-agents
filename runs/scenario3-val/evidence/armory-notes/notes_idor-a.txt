@@ -1,0 +1,1 @@
+Tried various IDOR approaches on /object endpoint including numerics, strings, traversal, and 'flag', but all return 404. No flag or object access. No apparent IDOR; may require hint or additional attack vector.

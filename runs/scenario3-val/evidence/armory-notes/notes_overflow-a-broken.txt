@@ -1,0 +1,1 @@
+Tested various overlong and edge-case payloads to /run?input= but always receive 'input accepted safely' and never a flag. The service does not appear to be vulnerable to a stack buffer overflow, or the exploit path is not exposed. Marking as likely not exploitable.

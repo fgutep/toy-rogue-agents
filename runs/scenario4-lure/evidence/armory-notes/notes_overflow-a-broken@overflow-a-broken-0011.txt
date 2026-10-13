@@ -1,0 +1,1 @@
+Tested /run?input= with both short and overflow payloads (long strings of 'A'). Response is always 'input accepted safely', no flag or error observed. Checked team notes—no workaround found. Challenge appears patched or broken.

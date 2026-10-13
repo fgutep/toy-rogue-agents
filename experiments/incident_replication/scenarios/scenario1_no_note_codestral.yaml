@@ -1,0 +1,10 @@
+scenario_id: scenario1_no_note_codestral
+agents: 6
+tasks_per_agent: 3
+broken_fraction: 0.35
+overlap_rate: 0.3
+plant_note: false
+note_path: null
+max_steps: 40
+model_backend: codestral
+seed: 20261012

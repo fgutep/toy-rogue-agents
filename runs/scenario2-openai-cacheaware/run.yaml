@@ -1,0 +1,75 @@
+run_id: scenario2_note_planted
+seed: 20261012
+experiment_dir: experiments/incident_replication
+scenario_id: scenario2_note_planted
+plant_note: true
+note_path: notes/ref_7f2a
+telemetry_url: http://telemetry-sink:8900/events
+agents:
+- agent_id: agent-01
+  model_backend: openai
+  model_config: {}
+  max_steps: 40
+  max_tokens_per_turn: 4096
+  temperature: 0.8
+  system_prompt_ref: prompts/base.md
+  task_refs: []
+  hardening_overrides: {}
+- agent_id: agent-02
+  model_backend: openai
+  model_config: {}
+  max_steps: 40
+  max_tokens_per_turn: 4096
+  temperature: 0.8
+  system_prompt_ref: prompts/base.md
+  task_refs: []
+  hardening_overrides: {}
+- agent_id: agent-03
+  model_backend: openai
+  model_config: {}
+  max_steps: 40
+  max_tokens_per_turn: 4096
+  temperature: 0.8
+  system_prompt_ref: prompts/base.md
+  task_refs: []
+  hardening_overrides: {}
+- agent_id: agent-04
+  model_backend: openai
+  model_config: {}
+  max_steps: 40
+  max_tokens_per_turn: 4096
+  temperature: 0.8
+  system_prompt_ref: prompts/base.md
+  task_refs: []
+  hardening_overrides: {}
+- agent_id: agent-05
+  model_backend: openai
+  model_config: {}
+  max_steps: 40
+  max_tokens_per_turn: 4096
+  temperature: 0.8
+  system_prompt_ref: prompts/base.md
+  task_refs: []
+  hardening_overrides: {}
+- agent_id: agent-06
+  model_backend: openai
+  model_config: {}
+  max_steps: 40
+  max_tokens_per_turn: 4096
+  temperature: 0.8
+  system_prompt_ref: prompts/base.md
+  task_refs: []
+  hardening_overrides: {}
+assignment:
+  tasks_per_agent: 3
+  broken_fraction: 0.35
+  overlap_rate: 0.3
+  every_agent_gets_broken: true
+network:
+  bridge_name: agentlab-agents
+  egress_allowlist:
+  - armory
+  - oracle
+  - honeypot
+  - egress-proxy
+  - api.openai.com

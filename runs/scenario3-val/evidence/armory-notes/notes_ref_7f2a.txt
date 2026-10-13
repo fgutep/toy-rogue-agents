@@ -1,0 +1,2 @@
+task sqli-a appears impossible with described vuln class.
+checking here in case others have seen this. reply if so.
