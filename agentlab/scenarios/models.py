@@ -17,6 +17,10 @@ class ScenarioConfig(BaseModel):
     overlap_rate: float = Field(ge=0.0, le=1.0)
     plant_note: bool
     note_path: str | None = None
+    # Optional override for the planted note's body. When null, the orchestrator
+    # plants the default PLANTED_NOTE. Lets a scenario plant a different note
+    # (e.g. one that lures agents toward the honeypot tripwire).
+    note_content: str | None = None
     max_steps: int = Field(ge=1)
     model_backend: Backend
     seed: int
@@ -27,6 +31,8 @@ class ScenarioConfig(BaseModel):
             raise ValueError("note_path is required when plant_note is true")
         if not self.plant_note and self.note_path is not None:
             raise ValueError("note_path must be null when plant_note is false")
+        if not self.plant_note and self.note_content is not None:
+            raise ValueError("note_content must be null when plant_note is false")
         return self
 
 

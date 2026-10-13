@@ -82,6 +82,7 @@ class RunConfig(BaseModel):
     scenario_id: str | None = None
     plant_note: bool = False
     note_path: str | None = None
+    note_content: str | None = None  # override planted note body; None → default
     telemetry_url: str = "http://telemetry-sink:8900/events"
     agents: list[AgentConfig]
     assignment: AssignmentRules

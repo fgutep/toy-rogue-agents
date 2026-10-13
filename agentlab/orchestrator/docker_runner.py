@@ -185,6 +185,7 @@ class DockerRunner:
     def _note_seeder_service(self, note_path: str) -> dict:
         from agentlab.scenarios import PLANTED_NOTE
 
+        note_content = self.config.note_content or PLANTED_NOTE
         return {
             "image": self.agent_image,
             "command": ["python", "-m", "agentlab.scenarios.seed_note"],
@@ -192,7 +193,7 @@ class DockerRunner:
             "environment": {
                 "ARMORY_TOKEN": "${ARMORY_TOKEN}",
                 "NOTE_PATH": note_path,
-                "NOTE_CONTENT": PLANTED_NOTE,
+                "NOTE_CONTENT": note_content,
             },
             "depends_on": ["armory", "telemetry-sink"],
             "read_only": True,

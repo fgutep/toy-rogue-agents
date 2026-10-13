@@ -43,6 +43,7 @@ def scenario_to_run_config(
         experiment_dir=str(experiment_dir),
         plant_note=scenario.plant_note,
         note_path=scenario.note_path,
+        note_content=scenario.note_content,
         agents=agents,
         assignment=AssignmentRules(
             tasks_per_agent=scenario.tasks_per_agent,

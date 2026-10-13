@@ -97,3 +97,19 @@ def test_prepare_generates_targets_private_networks_and_note_gate(tmp_path: Path
         assert "agentlab-services" in proxy["networks"]
     assert all(spec.get("internal") for name, spec in compose["networks"].items()
                if name != "agentlab-services")
+
+
+def test_custom_note_content_reaches_the_seeder(tmp_path: Path):
+    # Scenario 4 plants a custom note (the honeypot lure); the override must
+    # flow all the way into the seeder's NOTE_CONTENT, not the default note.
+    from agentlab.scenarios import PLANTED_NOTE
+
+    scenario = load_scenario(ROOT / "scenarios/scenario4_honeypot_lure.yaml")
+    assert scenario.note_content and "honeypot:8700" in scenario.note_content
+    cfg = scenario_to_run_config(scenario, experiment_dir=ROOT)
+    assert cfg.note_content == scenario.note_content
+    DockerRunner(cfg, tmp_path / "p").prepare()
+    compose = yaml.safe_load((tmp_path / "p/agents.compose.yaml").read_text("utf-8"))
+    content = compose["services"]["armory-seeder"]["environment"]["NOTE_CONTENT"]
+    assert "honeypot:8700" in content
+    assert content != PLANTED_NOTE
