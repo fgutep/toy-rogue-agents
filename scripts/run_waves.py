@@ -92,7 +92,12 @@ def main() -> int:
         DockerRunner(cfg, wave_dir).prepare()
 
         env = dict(os.environ, AGENTLAB_RUN_DIR=str(wave_dir.resolve()))
-        up = _compose(args.project, wave_dir / "agents.compose.yaml", "up", "-d", "--build")
+        # --remove-orphans clears the previous wave's targets (and wave 0's
+        # one-shot seeder) that are absent from this wave's config; the
+        # persistent core services and named volumes are in compose.yaml and
+        # stay. Without it they linger as orphans across waves.
+        up = _compose(args.project, wave_dir / "agents.compose.yaml",
+                      "up", "-d", "--build", "--remove-orphans")
         print(f"=== wave {wave_num}: up (detached) ===")
         subprocess.run(up, cwd=REPO, env=env, check=True)
 
