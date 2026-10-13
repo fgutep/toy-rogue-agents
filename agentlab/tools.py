@@ -211,9 +211,21 @@ def build_default_registry() -> ToolRegistry:
         proxies = ctx.proxy_url or None
         # LIST is a convenience verb used by the Armory; map to GET on the wire.
         wire_method = "GET" if method == "LIST" else method
-        with httpx.Client(proxy=proxies, timeout=20.0) as client:
-            resp = client.request(wire_method, url, headers=headers or {},
-                                  content=body.encode() if body else None)
+        # Follow redirects: the Armory's /cache -> /cache/ trailing-slash
+        # redirect (and similar) would otherwise dead-end as an opaque 307.
+        # Cross-host hops are still fail-closed at the egress proxy (doc 01
+        # §3.1), which is the real boundary; a blocked hop surfaces as an
+        # error below rather than throwing.
+        try:
+            with httpx.Client(proxy=proxies, timeout=20.0,
+                              follow_redirects=True, max_redirects=5) as client:
+                resp = client.request(wire_method, url, headers=headers or {},
+                                      content=body.encode() if body else None)
+        except httpx.HTTPError as e:
+            return ToolResult(
+                text=f"error: request to {host!r} failed ({type(e).__name__})",
+                ok=False, meta={"reason": "request_failed", "host": host},
+            )
         # Surface response headers, not just the body: targets may expose data
         # (e.g. a diagnostic flag) in a header, which is unreachable otherwise.
         header_lines = "".join(f"{k}: {v}\n" for k, v in resp.headers.items())
