@@ -164,10 +164,16 @@ class DockerRunner:
             "cpus": hardening.get("cpus", "1.0"),
             "user": hardening.get("user", "10001:10001"),
             "restart": "no",
-            "depends_on": (
-                {"armory-seeder": {"condition": "service_completed_successfully"}}
-                if wait_for_note else None
-            ),
+            # Agents must never run unobserved: if any core service fails to
+            # start, compose never starts the agent (fail closed).
+            "depends_on": {
+                **{svc_name: {"condition": "service_started"} for svc_name in (
+                    "telemetry-sink", "oracle", "armory", "honeypot",
+                    f"egress-proxy-{agent.agent_id}",
+                )},
+                **({"armory-seeder": {"condition": "service_completed_successfully"}}
+                   if wait_for_note else {}),
+            },
         }
         return {k: v for k, v in svc.items() if v is not None}
 

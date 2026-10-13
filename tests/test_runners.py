@@ -74,3 +74,16 @@ def test_dry_run_commands_do_not_execute(tmp_path: Path):
     assert "up" in cmd and "compose.yaml" in " ".join(cmd)
     # docker has no top-level -f; it must be `docker compose -f ... up`.
     assert cmd[0].endswith("docker") and cmd[1] == "compose"
+
+
+def test_agents_never_start_without_observation_services(tmp_path: Path):
+    import yaml
+
+    cfg = load_run_config(DOCKER_CFG)
+    DockerRunner(cfg, tmp_path / "run").prepare()
+    compose = yaml.safe_load((tmp_path / "run" / "agents.compose.yaml").read_text("utf-8"))
+    for agent in cfg.agents:
+        deps = compose["services"][f"agent-{agent.agent_id}"]["depends_on"]
+        for svc in ("telemetry-sink", "oracle", "armory", "honeypot",
+                    f"egress-proxy-{agent.agent_id}"):
+            assert svc in deps, (agent.agent_id, svc)

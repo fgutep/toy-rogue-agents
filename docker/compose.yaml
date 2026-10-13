@@ -47,7 +47,9 @@ services:
       - eventdata:/eventdata
       - armorydata:/armorydata
     cap_drop: ["ALL"]
+    cap_add: ["CHOWN"]  # root without CAP_CHOWN cannot chown
     security_opt: ["no-new-privileges:true"]
+    network_mode: none
     restart: "no"
 
   telemetry-sink:
