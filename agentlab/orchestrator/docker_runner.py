@@ -29,7 +29,7 @@ from agentlab.tasks.models import Manifest
 _HARDENING = {
     "read_only": True,
     "cap_drop": ["ALL"],
-    "security_opt": ["no-new-privileges:true", "seccomp=default"],
+    "security_opt": ["no-new-privileges:true"],
     "pids_limit": 256,
     "mem_limit": "1g",
     "cpus": "1.0",
@@ -41,7 +41,7 @@ class DockerRunner:
     def __init__(self, config: RunConfig, run_dir: str | Path,
                  agent_image: str = "agentlab-agent:latest") -> None:
         self.config = config
-        self.run_dir = Path(run_dir)
+        self.run_dir = Path(run_dir).resolve()
         self.run_dir.mkdir(parents=True, exist_ok=True)
         self.agent_image = agent_image
         self.repo_tasks = self.config.experiment_path() / "tasks"
@@ -60,14 +60,19 @@ class DockerRunner:
         )
 
         services: dict[str, dict] = {}
+        private_networks = {
+            agent.agent_id: f"{self.config.network.bridge_name}-{agent.agent_id}".lower()
+            for agent in self.config.agents
+        }
         for agent in self.config.agents:
             adir = self.run_dir / "agents" / agent.agent_id
             adir.mkdir(parents=True, exist_ok=True)
             (adir / "config.yaml").write_text(
                 yaml.safe_dump(agent.model_dump(by_alias=True)), encoding="utf-8"
             )
+            prompt = (self.config.experiment_path() / agent.system_prompt_ref).read_text("utf-8")
             (adir / "system_prompt.md").write_text(
-                (self.config.experiment_path() / agent.system_prompt_ref).read_text("utf-8"),
+                prompt.replace("{armory_url}", "http://armory:8800/cache"),
                 encoding="utf-8",
             )
             initial = []
@@ -79,13 +84,40 @@ class DockerRunner:
                 })
             (adir / "initial.json").write_text(json.dumps(initial, indent=2), encoding="utf-8")
 
-            services[f"agent-{agent.agent_id}"] = self._agent_service(agent, adir)
+            private = private_networks[agent.agent_id]
+            target_hosts = [
+                manifest.instances[iid].params["target_host"]
+                for iid in manifest.assignments[agent.agent_id]
+            ]
+            allowlist = sorted(set(self.config.network.egress_allowlist + target_hosts))
+            services[f"agent-{agent.agent_id}"] = self._agent_service(
+                agent, adir, private, allowlist, wait_for_note=self.config.plant_note
+            )
+            services[f"egress-proxy-{agent.agent_id}"] = self._proxy_service(
+                agent.agent_id, private, allowlist
+            )
+
+        if self.config.plant_note:
+            if not self.config.note_path:
+                raise ValueError("note_path is required when plant_note is true")
+            services["armory-seeder"] = self._note_seeder_service(self.config.note_path)
+
+        # A fresh, hardened target service is generated for every instance.
+        for instance in manifest.instances.values():
+            services[instance.params["target_host"]] = self._target_service(instance)
+
+        # The write-only sink is the sole core service attached directly to an
+        # agent-private network. It exposes no read route.
+        services["telemetry-sink"] = {
+            "networks": ["agentlab-services", *private_networks.values()]
+        }
 
         compose = {
             "services": services,
-            # Declared (not external) so the merged compose (base -f + this -f)
-            # resolves the network; base/compose.yaml declares the same name.
-            "networks": {self.config.network.bridge_name: {}},
+            "networks": {
+                "agentlab-services": {},
+                **{name: {"internal": True} for name in private_networks.values()},
+            },
             "volumes": {f"ws-{a.agent_id}": {} for a in self.config.agents},
         }
         (self.run_dir / "agents.compose.yaml").write_text(
@@ -93,28 +125,30 @@ class DockerRunner:
         )
         return manifest
 
-    def _agent_service(self, agent, adir: Path) -> dict:
+    def _agent_service(self, agent, adir: Path, private_network: str,
+                       allowlist: list[str], *, wait_for_note: bool = False) -> dict:
         hardening = dict(_HARDENING)
-        # Overrides must be justified; the justification travels into the run
-        # record via the agent config, which is logged as a run event (doc 01 §4).
         for key in agent.hardening_overrides:
             hardening.pop(key, None)
+        proxy_url = f"http://egress-proxy-{agent.agent_id}:3128"
         svc = {
             "image": self.agent_image,
             "command": ["python", "-m", "agentlab.agent_entry"],
-            "networks": [self.config.network.bridge_name],
+            "networks": [private_network],
             "environment": {
                 "AGENTLAB_AGENT_CONFIG": "/agent/config.yaml",
                 "AGENTLAB_SYSTEM_PROMPT": "/agent/system_prompt.md",
                 "AGENTLAB_INITIAL_MSGS": "/agent/initial.json",
                 "AGENTLAB_WORKSPACE": "/workspace",
                 "AGENTLAB_TELEMETRY": self.config.telemetry_url,
-                # Reached through the egress proxy (the single chokepoint); the
-                # proxy injects X-Agent-Identity for internal services.
                 "AGENTLAB_ORACLE_URL": "http://oracle:8600/submit",
-                "AGENTLAB_PROXY_URL": "http://egress-proxy:3128",
-                "AGENTLAB_EGRESS_ALLOW": ",".join(self.config.network.egress_allowlist),
-                # Backend API keys flow in from the host env, never baked in.
+                "AGENTLAB_ARMORY_URL": "http://armory:8800/cache",
+                "ARMORY_TOKEN": "${ARMORY_TOKEN}",
+                "AGENTLAB_PROXY_URL": proxy_url,
+                "AGENTLAB_EGRESS_ALLOW": ",".join(allowlist),
+                "HTTP_PROXY": proxy_url,
+                "HTTPS_PROXY": proxy_url,
+                "NO_PROXY": "telemetry-sink,localhost,127.0.0.1",
                 **{k: f"${{{k}}}" for k in _api_key_env_for(agent.model_backend)},
             },
             "volumes": [
@@ -130,8 +164,76 @@ class DockerRunner:
             "cpus": hardening.get("cpus", "1.0"),
             "user": hardening.get("user", "10001:10001"),
             "restart": "no",
+            "depends_on": (
+                {"armory-seeder": {"condition": "service_completed_successfully"}}
+                if wait_for_note else None
+            ),
         }
         return {k: v for k, v in svc.items() if v is not None}
+
+    def _note_seeder_service(self, note_path: str) -> dict:
+        from agentlab.scenarios import PLANTED_NOTE
+
+        return {
+            "image": self.agent_image,
+            "command": ["python", "-m", "agentlab.scenarios.seed_note"],
+            "networks": ["agentlab-services"],
+            "environment": {
+                "ARMORY_TOKEN": "${ARMORY_TOKEN}",
+                "NOTE_PATH": note_path,
+                "NOTE_CONTENT": PLANTED_NOTE,
+            },
+            "depends_on": ["armory", "telemetry-sink"],
+            "read_only": True,
+            "tmpfs": ["/tmp"],
+            "cap_drop": ["ALL"],
+            "security_opt": ["no-new-privileges:true"],
+            "user": "10001:10001",
+            "restart": "no",
+        }
+
+    def _proxy_service(self, agent_id: str, private_network: str,
+                       allowlist: list[str]) -> dict:
+        return {
+            "image": self.agent_image,
+            "command": ["python", "-m", "agentlab.proxy.proxy"],
+            "networks": [private_network, "agentlab-services"],
+            "environment": {
+                "AGENTLAB_EGRESS_ALLOW": ",".join(allowlist),
+                "AGENTLAB_PROXY_PORT": "3128",
+            },
+            "read_only": True,
+            "tmpfs": ["/tmp"],
+            "cap_drop": ["ALL"],
+            "security_opt": ["no-new-privileges:true"],
+            "pids_limit": 128,
+            "mem_limit": "256m",
+            "cpus": "0.5",
+            "user": "10001:10001",
+            "restart": "no",
+        }
+
+    def _target_service(self, instance) -> dict:
+        target_dir = (self.repo_tasks / instance.task_id / "target").resolve()
+        if not (target_dir / "Dockerfile").exists():
+            raise FileNotFoundError(f"target Dockerfile not found: {target_dir}")
+        return {
+            "build": {"context": str(target_dir)},
+            "networks": ["agentlab-services"],
+            "environment": {
+                "FLAG": instance.params.get("flag", ""),
+                "TASK_INSTANCE_ID": instance.instance_id,
+            },
+            "read_only": True,
+            "tmpfs": ["/tmp"],
+            "cap_drop": ["ALL"],
+            "security_opt": ["no-new-privileges:true"],
+            "pids_limit": 64,
+            "mem_limit": "128m",
+            "cpus": "0.5",
+            "user": "10001:10001",
+            "restart": "no",
+        }
 
     # -- host-side actions ------------------------------------------------ #
     def up(self, *, dry_run: bool = False) -> list[str]:

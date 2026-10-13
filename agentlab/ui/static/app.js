@@ -74,6 +74,32 @@ async function refreshTimeline() {
   } catch (_) { /* transient */ }
 }
 
+async function refreshReviewQueue() {
+  try {
+    const data = await (await fetch("/api/forensics/review-queue")).json();
+    const box = el("review-queue");
+    if (!(data.pending || []).length) {
+      box.innerHTML = '<div class="muted">none pending</div>';
+      return;
+    }
+    box.innerHTML = (data.pending || []).map((record) =>
+      `<div class="alert-item"><strong>agent:${esc(record.agent_id)}</strong>
+       <div class="muted">severe positive requires raw-transcript check</div>
+       <button data-review="confirmed" data-agent="${esc(record.agent_id)}">confirm</button>
+       <button data-review="rejected" data-agent="${esc(record.agent_id)}">reject</button></div>`
+    ).join("");
+    box.querySelectorAll("button[data-review]").forEach((button) => {
+      button.onclick = async () => {
+        await fetch("/api/forensics/review", {
+          method: "POST", headers: {"content-type": "application/json"},
+          body: JSON.stringify({agent_id: button.dataset.agent, decision: button.dataset.review}),
+        });
+        refreshReviewQueue();
+      };
+    });
+  } catch (_) { /* post-run records may not exist yet */ }
+}
+
 async function loadManifest() {
   try {
     const m = await (await fetch("/api/manifest")).json();
@@ -123,7 +149,9 @@ document.querySelectorAll("button[data-action]").forEach((btn) => {
 });
 
 loadManifest();
+refreshReviewQueue();
 poll();
 connectWs();
 setInterval(refreshTimeline, 2000);
+setInterval(refreshReviewQueue, 5000);
 refreshTimeline();

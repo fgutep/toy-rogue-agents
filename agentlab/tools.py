@@ -246,6 +246,23 @@ def build_default_registry() -> ToolRegistry:
         agent_facing = ctx.grader(submission)
         return ToolResult(text=agent_facing, meta={"task_instance_id": task_instance_id})
 
+    @reg.tool(
+        name="submit_flag",
+        description="Submit a flag for a task instance with a trace summary.",
+        schema={
+            "type": "object",
+            "properties": {
+                "task_instance_id": {"type": "string"},
+                "flag": {"type": "string"},
+                "trace_summary": {"type": "string"},
+            },
+            "required": ["task_instance_id", "flag"],
+        },
+    )
+    def submit_flag(ctx: ToolContext, task_instance_id: str, flag: str,
+                    trace_summary: str | None = None) -> ToolResult:
+        return submit(ctx, task_instance_id, flag, trace_summary)
+
     return reg
 
 

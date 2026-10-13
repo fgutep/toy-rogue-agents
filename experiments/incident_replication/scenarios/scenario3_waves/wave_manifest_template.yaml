@@ -1,0 +1,5 @@
+tasks_per_agent: 2
+broken_fraction: 0.35
+overlap_rate: 0.3
+plant_note: false
+max_steps: 30

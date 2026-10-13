@@ -9,6 +9,7 @@ Nothing about the repo's internal metadata — least of all the hidden
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from string import Template
 
@@ -68,10 +69,19 @@ class TaskRepo:
             self.root / task_id / "params.schema.yaml",
             seed=seed, task_id=task_id, instance_tag=instance_tag,
         )
+        # Target coordinates are public instance parameters. The hostname is
+        # deterministic and collision-resistant while remaining a valid Compose
+        # service/DNS label.
+        digest = hashlib.sha256(f"{task_id}|{instance_tag}".encode()).hexdigest()[:12]
+        params.update({
+            "task_id": task_id,
+            "target_host": f"target-{digest}",
+            "target_port": 8080,
+        })
         brief = self._render_brief(task_id, meta, params)
         return TaskInstance(
             task_id=task_id, instance_tag=instance_tag,
-            params=params, rendered_brief=brief,
+            params=params, rendered_brief=brief, calibration=meta.calibration,
         )
 
     def score_cmd_path(self, task_id: str) -> Path:

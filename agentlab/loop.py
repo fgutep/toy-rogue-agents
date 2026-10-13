@@ -78,6 +78,10 @@ def run_agent(
         source=f"agent:{config.agent_id}", kind="agent_start",
         payload={"backend": config.model_backend, "max_steps": config.max_steps},
     )
+    telemetry.emit(
+        source=f"agent:{config.agent_id}", kind="transcript_initial",
+        payload={"messages": [message.model_dump() for message in messages]},
+    )
 
     step = 0
     stop_reason = "max_steps"

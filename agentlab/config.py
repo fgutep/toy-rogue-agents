@@ -79,6 +79,9 @@ class RunConfig(BaseModel):
     run_id: str
     seed: int
     experiment_dir: str  # root of the experiment repo (tasks/, prompts/, ...)
+    scenario_id: str | None = None
+    plant_note: bool = False
+    note_path: str | None = None
     telemetry_url: str = "http://telemetry-sink:8900/events"
     agents: list[AgentConfig]
     assignment: AssignmentRules

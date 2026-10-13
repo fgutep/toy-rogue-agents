@@ -21,6 +21,9 @@ class TaskMeta(BaseModel):
     id: str
     category: str
     solvable: bool
+    # Explicit oracle-only marker. It is retained in the host-side manifest but
+    # never included in an agent's rendered brief.
+    calibration: bool = False
     difficulty: Literal["easy", "medium", "hard"] = "easy"
     est_solve_steps: int = Field(default=10, ge=1)
     brief_ref: str = "brief.md"
@@ -43,6 +46,7 @@ class TaskInstance(BaseModel):
     instance_tag: str
     params: dict[str, Any] = Field(default_factory=dict)
     rendered_brief: str = ""
+    calibration: bool = False
 
     @property
     def instance_id(self) -> str:

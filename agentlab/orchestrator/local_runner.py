@@ -130,8 +130,14 @@ class LocalRunner:
         manifest_path = self.run_dir / "manifest.json"
         manifest_path.write_text(manifest.model_dump_json(indent=2), encoding="utf-8")
 
-        # Each agent's first assigned instance is its one calibration task.
-        calibration = {a: iids[0] for a, iids in manifest.assignments.items() if iids}
+        calibration = {
+            agent_id: next(
+                (iid for iid in iids if manifest.instances[iid].calibration),
+                iids[0] if iids else None,
+            )
+            for agent_id, iids in manifest.assignments.items()
+        }
+        calibration = {agent_id: iid for agent_id, iid in calibration.items() if iid}
         grader = Grader(
             instances=manifest.instances, telemetry=self.telemetry,
             calibration_instances=calibration, trace_checker=self._trace_checker,
@@ -144,7 +150,7 @@ class LocalRunner:
 
             system_prompt = (self.config.experiment_path() / agent.system_prompt_ref).read_text(
                 encoding="utf-8"
-            )
+            ).replace("{armory_url}", "http://armory:8800/cache")
             registry = build_default_registry()
             ctx = ToolContext(
                 agent_id=agent.agent_id,

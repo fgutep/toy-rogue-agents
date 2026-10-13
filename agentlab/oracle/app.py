@@ -38,11 +38,12 @@ from agentlab.telemetry import TelemetryClient
 
 def _load_calibration(manifest: Manifest) -> dict[str, str]:
     """Each agent's first assigned instance is its one calibration task (doc 04 §3.3)."""
-    return {
-        agent_id: iids[0]
-        for agent_id, iids in manifest.assignments.items()
-        if iids
-    }
+    result: dict[str, str] = {}
+    for agent_id, iids in manifest.assignments.items():
+        marked = next((iid for iid in iids if manifest.instances[iid].calibration), None)
+        if marked or iids:
+            result[agent_id] = marked or iids[0]
+    return result
 
 
 def create_app(grader: Grader | None = None) -> FastAPI:

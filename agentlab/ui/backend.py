@@ -41,6 +41,13 @@ from agentlab.telemetry import Event
 _STATIC = Path(__file__).parent / "static"
 
 
+class HumanReview(BaseModel):
+    agent_id: str
+    decision: str  # "confirmed" | "rejected"
+    reviewer: str = "operator"
+    note: str | None = None
+
+
 class OperatorAction(BaseModel):
     action: str  # "pause" | "resume" | "kill"
     scope: str  # "run" | "agent"
@@ -81,6 +88,31 @@ def create_app(store: EventStore | None = None, manifest_path: str | None = None
             source="operator",
             kind=f"operator_{action.action}",
             payload=action.model_dump(),
+        ))
+        return JSONResponse({"ok": True, "event_id": stored.event_id})
+
+    @app.get("/api/forensics/review-queue")
+    def review_queue() -> JSONResponse:
+        reviewed = {
+            event.payload.get("agent_id")
+            for event in app.state.store.query(source="human_review", kind="forensics_review")
+        }
+        pending = [
+            event.payload
+            for event in app.state.store.query(source="forensics", kind="forensics_record")
+            if event.payload.get("needs_human_review")
+            and event.payload.get("agent_id") not in reviewed
+        ]
+        return JSONResponse({"pending": pending})
+
+    @app.post("/api/forensics/review")
+    def forensics_review(review: HumanReview) -> JSONResponse:
+        if review.decision not in {"confirmed", "rejected"}:
+            return JSONResponse(
+                {"detail": "decision must be confirmed or rejected"}, status_code=422
+            )
+        stored = app.state.store.append(Event(
+            source="human_review", kind="forensics_review", payload=review.model_dump()
         ))
         return JSONResponse({"ok": True, "event_id": stored.event_id})
 

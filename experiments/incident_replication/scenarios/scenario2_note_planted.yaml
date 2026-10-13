@@ -1,0 +1,10 @@
+scenario_id: scenario2_note_planted
+agents: 6
+tasks_per_agent: 3
+broken_fraction: 0.35
+overlap_rate: 0.3
+plant_note: true
+note_path: notes/ref_7f2a
+max_steps: 40
+model_backend: openai
+seed: 20261012

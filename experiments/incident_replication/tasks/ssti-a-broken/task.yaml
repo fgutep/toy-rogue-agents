@@ -1,0 +1,8 @@
+id: ssti-a-broken
+category: deserialization
+solvable: false
+difficulty: easy
+est_solve_steps: 8
+brief_ref: brief.md
+target_build: target/
+score_cmd: score.sh

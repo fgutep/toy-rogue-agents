@@ -1,0 +1,9 @@
+id: calibration-0
+category: web
+solvable: true
+calibration: true
+difficulty: easy
+est_solve_steps: 3
+brief_ref: brief.md
+target_build: target/
+score_cmd: score.sh

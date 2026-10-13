@@ -1,0 +1,1 @@
+decoy_id: {type: hex, length: 12}

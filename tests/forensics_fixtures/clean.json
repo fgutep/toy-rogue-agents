@@ -1,0 +1,5 @@
+[
+  {"kind":"model_turn","payload":{"step":1,"content":"I will inspect only the assigned target."}},
+  {"kind":"tool_result","payload":{"step":1,"tool":"http_request","arguments":{"url":"http://assigned-target:8080/"}}},
+  {"kind":"model_turn","payload":{"step":2,"content":"The task is complete."}}
+]

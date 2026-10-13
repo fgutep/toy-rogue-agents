@@ -91,6 +91,77 @@ def manifest(config_path: str, out_path: str | None) -> None:
         click.echo(text)
 
 
+@main.command("scenario-config")
+@click.option("--scenario", "scenario_path", required=True)
+@click.option("--out", "out_path", required=True)
+@click.option("--run-id", default=None)
+def scenario_config(scenario_path: str, out_path: str, run_id: str | None) -> None:
+    """Render one declarative scenario into a normal run config; does not run it."""
+    from pathlib import Path
+
+    import yaml
+
+    from agentlab.scenarios import load_scenario, scenario_to_run_config
+
+    source = Path(scenario_path)
+    cfg = scenario_to_run_config(
+        load_scenario(source), experiment_dir=source.parent.parent, run_id=run_id
+    )
+    Path(out_path).write_text(
+        yaml.safe_dump(cfg.model_dump(by_alias=True, exclude_none=True), sort_keys=False),
+        encoding="utf-8",
+    )
+    click.echo(f"wrote run config to {out_path}; nothing was launched")
+
+
+@main.command("prepare-scenario")
+@click.option("--scenario", "scenario_path", required=True)
+@click.option("--run-dir", "run_dir", required=True)
+@click.option("--run-id", default=None)
+def prepare_scenario(scenario_path: str, run_dir: str, run_id: str | None) -> None:
+    """Generate manifest and Compose inputs for a scenario; launch nothing."""
+    from pathlib import Path
+
+    from agentlab.orchestrator.docker_runner import DockerRunner
+    from agentlab.scenarios import load_scenario, scenario_to_run_config
+
+    source = Path(scenario_path)
+    cfg = scenario_to_run_config(
+        load_scenario(source), experiment_dir=source.parent.parent, run_id=run_id
+    )
+    manifest = DockerRunner(cfg, run_dir).prepare()
+    click.echo(f"prepared {len(manifest.assignments)} agents in {run_dir}; nothing was launched")
+
+
+@main.command("forensics")
+@click.option("--db", "db_path", required=True)
+@click.option("--run-id", required=True)
+@click.option("--backend", required=True)
+@click.option("--model", required=True)
+@click.option("--scenario-id", default=None)
+def forensics(
+    db_path: str, run_id: str, backend: str, model: str, scenario_id: str | None
+) -> None:
+    """Run the read-only post-run classifier after an experiment has ended."""
+    from agentlab.adapters import build_adapter
+    from agentlab.eventstore import EventStore
+    from agentlab.forensics import ensure_independent_family, run_forensics
+
+    store = EventStore(db_path)
+    ensure_independent_family(store, backend)
+    adapter = build_adapter(backend, {"model": model})
+    records, summary = run_forensics(
+        store,
+        run_id=run_id,
+        adapter=adapter,
+        forensics_model=model,
+        scenario_id=scenario_id,
+    )
+    click.echo(json.dumps({
+        "records": len(records), "summary": summary.model_dump()
+    }, indent=2))
+
+
 @main.command("timeline")
 @click.option("--db", "db_path", required=True)
 @click.option("--out", "out_path", default=None)

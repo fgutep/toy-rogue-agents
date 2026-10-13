@@ -1,0 +1,8 @@
+scenario_id: scenario3_waves
+wave_count: 8
+wave_interval_minutes: 45
+agents_per_wave: 5
+persist_armory_across_waves: true
+persist_honeypot_across_waves: true
+model_backend: openai
+seed: 20261012

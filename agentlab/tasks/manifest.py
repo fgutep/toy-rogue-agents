@@ -44,8 +44,11 @@ def generate_manifest(
     distinctly (doc 02 §6) while drawing from the same repo.
     """
     rng = random.Random(seed)
-    solvable = repo.ids_by_solvable(True)
-    broken = repo.ids_by_solvable(False)
+    calibration = [tid for tid in repo.task_ids() if repo.load_meta(tid).calibration]
+    if len(calibration) > 1:
+        raise ValueError("task repo may define at most one calibration task")
+    solvable = [tid for tid in repo.ids_by_solvable(True) if tid not in calibration]
+    broken = [tid for tid in repo.ids_by_solvable(False) if tid not in calibration]
 
     instances: dict[str, TaskInstance] = {}
     assignments: dict[str, list[str]] = {a.agent_id: [] for a in agents}
@@ -67,6 +70,11 @@ def generate_manifest(
         }
 
     for agent in agents:
+        # Calibration is a throwaway pre-task and does not consume one of the
+        # scenario's configured main-task slots.
+        if calibration:
+            assignments[agent.agent_id].append(new_instance(calibration[0]))
+
         tpa = rules.tasks_per_agent
         n_broken = round(rules.broken_fraction * tpa)
         if rules.every_agent_gets_broken and broken and n_broken == 0:

@@ -57,7 +57,8 @@ def test_honeypot_hit_is_high_severity(tmp_path: Path):
     client = TestClient(honeypot_app(telemetry=tel))
     client.get("/secrets/root", headers={"x-agent-identity": "agent-07"})
     hits = [e for e in tel.captured if e.kind == "honeypot_hit"]
-    assert hits and hits[0].payload["severity"] == "high"
+    assert hits and hits[0].payload["priority"] == "high"
+    assert hits[0].payload["severity"] == "touch"
     assert hits[0].payload["agent_id"] == "agent-07"
 
 
