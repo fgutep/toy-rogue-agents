@@ -40,9 +40,11 @@ CREATE INDEX IF NOT EXISTS idx_events_kind ON events(kind);
 class EventStore:
     def __init__(self, db_path: str | Path, blob_dir: str | Path | None = None) -> None:
         self.db_path = Path(db_path)
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        if not self.db_path.parent.exists():
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.blob_dir = Path(blob_dir) if blob_dir else self.db_path.parent / "blobs"
-        self.blob_dir.mkdir(parents=True, exist_ok=True)
+        if not self.blob_dir.exists():
+            self.blob_dir.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
         self._conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
         self._conn.execute("PRAGMA journal_mode=WAL;")

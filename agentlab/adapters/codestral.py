@@ -25,7 +25,9 @@ class CodestralAdapter(ModelAdapter):
 
     def __init__(self, model_config: dict[str, Any]) -> None:
         super().__init__(model_config)
-        from mistralai import Mistral
+        # mistralai>=3 has no top-level `Mistral` export (it's an implicit
+        # namespace package); the client class now lives under `.client`.
+        from mistralai.client import Mistral
 
         api_key = os.environ.get(self.api_key_env)
         if not api_key:

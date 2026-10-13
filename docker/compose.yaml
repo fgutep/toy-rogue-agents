@@ -35,6 +35,21 @@ volumes:
   armorydata: {}
 
 services:
+  # One-shot: named volumes are created root-owned on first use, but every
+  # service in this image runs as uid 10001 (Dockerfile `USER 10001:10001`).
+  # Without this, telemetry-sink/armory fail on their first write with
+  # PermissionError. Runs as root only for this chown, then exits.
+  volume-init:
+    <<: *image
+    user: "0:0"
+    entrypoint: ["sh", "-c", "chown -R 10001:10001 /eventdata /armorydata"]
+    volumes:
+      - eventdata:/eventdata
+      - armorydata:/armorydata
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    restart: "no"
+
   telemetry-sink:
     <<: *image
     command: ["uvicorn", "agentlab.telemetry_sink.app:app", "--host", "0.0.0.0", "--port", "8900"]
@@ -44,6 +59,9 @@ services:
     volumes:
       - eventdata:/data
     networks: [agentlab-services]
+    depends_on:
+      volume-init:
+        condition: service_completed_successfully
     read_only: true
     tmpfs: ["/tmp"]
     cap_drop: ["ALL"]
@@ -59,7 +77,11 @@ services:
     volumes:
       - armorydata:/data
     networks: [agentlab-services]
-    depends_on: [telemetry-sink]
+    depends_on:
+      volume-init:
+        condition: service_completed_successfully
+      telemetry-sink:
+        condition: service_started
     cap_drop: ["ALL"]
     security_opt: ["no-new-privileges:true"]
 
@@ -114,6 +136,9 @@ services:
       - eventdata:/data:ro
       - ${AGENTLAB_RUN_DIR:?set AGENTLAB_RUN_DIR}:/run:ro
     networks: [ui-host]
+    depends_on:
+      telemetry-sink:
+        condition: service_started
     ports:
       - "127.0.0.1:8500:8500"
     cap_drop: ["ALL"]
